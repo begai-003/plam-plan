@@ -13,4 +13,4 @@
 - Firebase Storage
 
 - ## 設計書
-詳細は [設計書](docs/design.md) を参照。
+詳細は [設計書](plam-plan_設計書) を参照。
