@@ -1,0 +1,40 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Replace through npm run rules:prepare. This placeholder denies all access.
+    function owner(uid) { return request.auth != null && request.auth.uid == uid && uid == '__ALLOWED_UID__'; }
+    function stringField(data, key, max) { return data[key] is string && data[key].size() <= max; }
+    function requiredText(data, key, max) { return stringField(data, key, max) && data[key].size() > 0; }
+    function common(data) { return data.schemaVersion == 1 && data.revision is int && data.revision > 0 && data.createdAt is timestamp && data.updatedAt == request.time; }
+    function imagePath(data, uid, kitId) { return data.imagePath == null || (data.imagePath is string && data.imagePath.matches('users/' + uid + '/kits/' + kitId + '/[^/]+')); }
+    function kit(data, uid, kitId) {
+      return data.keys().hasAll(['schemaVersion','revision','name','series','memo','imagePath','runners','groups','maskings','status','createdAt','updatedAt'])
+        && data.keys().hasOnly(['schemaVersion','revision','name','series','memo','imagePath','runners','groups','maskings','status','createdAt','updatedAt'])
+        && common(data) && requiredText(data,'name',100) && stringField(data,'series',100) && stringField(data,'memo',2000)
+        && imagePath(data,uid,kitId) && data.runners is list && data.runners.size() <= 100 && data.groups is list && data.groups.size() <= 100
+        && data.maskings is list && data.maskings.size() <= 200 && data.status in ['active','deleting'];
+    }
+    function paint(data) {
+      return data.keys().hasAll(['schemaVersion','revision','name','manufacturer','color','type','memo','bottles','dilutedBottleCount','archived','createdAt','updatedAt'])
+        && data.keys().hasOnly(['schemaVersion','revision','name','manufacturer','color','type','memo','bottles','dilutedBottleCount','archived','createdAt','updatedAt'])
+        && common(data) && requiredText(data,'name',100) && requiredText(data,'manufacturer',100) && requiredText(data,'color',100)
+        && stringField(data,'type',100) && stringField(data,'memo',2000) && data.bottles is list && data.archived is bool
+        && data.dilutedBottleCount is int && data.dilutedBottleCount >= 0 && data.dilutedBottleCount <= 9007199254740991;
+    }
+    function create(data) { return data.revision == 1 && data.createdAt == request.time; }
+    function update(data) { return data.createdAt == resource.data.createdAt && data.revision == resource.data.revision + 1; }
+    match /users/{uid}/kits/{kitId} {
+      allow read: if owner(uid);
+      allow create: if owner(uid) && kit(request.resource.data,uid,kitId) && create(request.resource.data) && request.resource.data.status == 'active';
+      allow update: if owner(uid) && kit(request.resource.data,uid,kitId) && update(request.resource.data) && resource.data.status == 'active';
+      allow delete: if owner(uid) && resource.data.status == 'deleting';
+    }
+    match /users/{uid}/paints/{paintId} {
+      allow read: if owner(uid);
+      allow create: if owner(uid) && paint(request.resource.data) && create(request.resource.data) && request.resource.data.archived == false;
+      allow update: if owner(uid) && paint(request.resource.data) && update(request.resource.data);
+      allow delete: if false;
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}

@@ -1,0 +1,14 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function owner(uid) { return request.auth != null && request.auth.uid == uid && uid == '__ALLOWED_UID__'; }
+    match /users/{uid}/kits/{kitId}/{imageId} {
+      allow read: if owner(uid);
+      allow create, update: if owner(uid) && request.resource.size > 0 && request.resource.size <= 5 * 1024 * 1024 && request.resource.contentType.matches('image/(jpeg|png|webp)');
+      allow delete: if owner(uid);
+    }
+    // Prefix listing is required to finish a kit deletion, including orphan uploads.
+    match /users/{uid}/kits/{kitId}/{allPaths=**} { allow list: if owner(uid); }
+    match /{allPaths=**} { allow read, write: if false; }
+  }
+}
