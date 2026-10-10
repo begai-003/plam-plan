@@ -211,7 +211,7 @@ footer span {
 .kit-card-body h2 {
   margin: 6px 0;
 }
-.kit-image {
+.kit-placeholder {
   background: #e9eae2;
   min-height: 180px;
   display: flex;
@@ -222,17 +222,12 @@ footer span {
   gap: 8px;
   overflow: hidden;
 }
-.kit-image svg {
+.kit-placeholder svg {
   width: 66px;
   height: 66px;
 }
-.kit-image span {
+.kit-placeholder span {
   font-size: 0.75rem;
-}
-.kit-image img {
-  width: 100%;
-  height: 220px;
-  object-fit: contain;
 }
 .kit-grid.list {
   grid-template-columns: 1fr;
@@ -241,13 +236,10 @@ footer span {
   display: grid;
   grid-template-columns: 180px minmax(0, 1fr);
 }
-.list .kit-image {
+.list .kit-placeholder {
   min-height: 150px;
 }
-.list .kit-image img {
-  height: 180px;
-}
-.panel {
+.list .panel {
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 24px;
@@ -260,12 +252,9 @@ footer span {
   gap: 30px;
   margin: 28px 0;
 }
-.kit-image.large {
+.kit-placeholder.large {
   border-radius: 12px;
   min-height: 230px;
-}
-.kit-image.large img {
-  height: 260px;
 }
 .pre {
   white-space: pre-wrap;
@@ -602,7 +591,7 @@ dialog::backdrop {
   .kit-grid.list .kit-card {
     grid-template-columns: 105px minmax(0, 1fr);
   }
-  .list .kit-image {
+  .list .kit-placeholder {
     min-height: 150px;
   }
   .kit-card-body {
@@ -612,7 +601,7 @@ dialog::backdrop {
     grid-template-columns: 1fr;
     gap: 20px;
   }
-  .kit-image.large {
+  .kit-placeholder.large {
     min-height: 180px;
   }
   .panel {

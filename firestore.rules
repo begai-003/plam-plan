@@ -6,12 +6,11 @@ service cloud.firestore {
     function stringField(data, key, max) { return data[key] is string && data[key].size() <= max; }
     function requiredText(data, key, max) { return stringField(data, key, max) && data[key].size() > 0; }
     function common(data) { return data.schemaVersion == 1 && data.revision is int && data.revision > 0 && data.createdAt is timestamp && data.updatedAt == request.time; }
-    function imagePath(data, uid, kitId) { return data.imagePath == null || (data.imagePath is string && data.imagePath.matches('users/' + uid + '/kits/' + kitId + '/[^/]+')); }
     function kit(data, uid, kitId) {
-      return data.keys().hasAll(['schemaVersion','revision','name','series','memo','imagePath','runners','groups','maskings','status','createdAt','updatedAt'])
+      return data.keys().hasAll(['schemaVersion','revision','name','series','memo','runners','groups','maskings','status','createdAt','updatedAt'])
         && data.keys().hasOnly(['schemaVersion','revision','name','series','memo','imagePath','runners','groups','maskings','status','createdAt','updatedAt'])
         && common(data) && requiredText(data,'name',100) && stringField(data,'series',100) && stringField(data,'memo',2000)
-        && imagePath(data,uid,kitId) && data.runners is list && data.runners.size() <= 100 && data.groups is list && data.groups.size() <= 100
+        && data.runners is list && data.runners.size() <= 100 && data.groups is list && data.groups.size() <= 100
         && data.maskings is list && data.maskings.size() <= 200 && data.status in ['active','deleting'];
     }
     function paint(data) {
@@ -25,8 +24,8 @@ service cloud.firestore {
     function update(data) { return data.createdAt == resource.data.createdAt && data.revision == resource.data.revision + 1; }
     match /users/{uid}/kits/{kitId} {
       allow read: if owner(uid);
-      allow create: if owner(uid) && kit(request.resource.data,uid,kitId) && create(request.resource.data) && request.resource.data.status == 'active';
-      allow update: if owner(uid) && kit(request.resource.data,uid,kitId) && update(request.resource.data) && resource.data.status == 'active';
+      allow create: if owner(uid) && kit(request.resource.data,uid,kitId) && !request.resource.data.keys().hasAny(['imagePath']) && create(request.resource.data) && request.resource.data.status == 'active';
+      allow update: if owner(uid) && kit(request.resource.data,uid,kitId) && (!request.resource.data.keys().hasAny(['imagePath']) || (resource.data.keys().hasAny(['imagePath']) && request.resource.data.imagePath == resource.data.imagePath)) && update(request.resource.data) && resource.data.status == 'active';
       allow delete: if owner(uid) && resource.data.status == 'deleting';
     }
     match /users/{uid}/paints/{paintId} {

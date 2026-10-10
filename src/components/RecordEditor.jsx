@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { Button, Message } from "./common";
 import { KitFields, PaintFields } from "./forms";
 import { clone, uuid, newKit, newPaint } from "../domain";
-import { saveKitWithImage } from "../services/imageRepository";
-import { paintRepository } from "../services/repository";
+import { kitRepository, paintRepository } from "../services/repository";
 export function RecordEditor({
   kind,
   record,
@@ -19,13 +18,9 @@ export function RecordEditor({
     () => original || (kind === "kit" ? newKit() : newPaint()),
   );
   const [initial] = useState(() => JSON.stringify(draft));
-  const [file, setFile] = useState(null);
-  const [imageId, setImageId] = useState(uuid);
-  const [removeImage, setRemoveImage] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const dirty =
-    JSON.stringify(draft) !== initial || Boolean(file) || removeImage;
+  const dirty = JSON.stringify(draft) !== initial;
   useEffect(() => {
     setDirty(dirty);
     return () => setDirty(false);
@@ -37,20 +32,14 @@ export function RecordEditor({
     setBusy(true);
     setError("");
     try {
-      let warning;
       if (kind === "kit")
-        warning = await saveKitWithImage(
-          id,
-          draft,
-          original?.revision,
-          { paints, previous: original },
-          file,
-          removeImage,
-          imageId,
-        );
+        await kitRepository.save(id, draft, original?.revision, {
+          paints,
+          previous: original,
+        });
       else await paintRepository.save(id, draft, original?.revision);
       setDirty(false);
-      onNotice(warning || "保存しました");
+      onNotice("保存しました");
       navigate(kind === "kit" ? `/kits/${id}` : "/paints", true);
     } catch (err) {
       setError(err.message);
@@ -70,17 +59,7 @@ export function RecordEditor({
       <form onSubmit={save}>
         <fieldset disabled={busy}>
           {kind === "kit" ? (
-            <KitFields
-              draft={draft}
-              setDraft={setDraft}
-              file={file}
-              setFile={(value) => {
-                setFile(value);
-                setImageId(uuid());
-              }}
-              removeImage={removeImage}
-              setRemoveImage={setRemoveImage}
-            />
+            <KitFields draft={draft} setDraft={setDraft} />
           ) : (
             <PaintFields draft={draft} setDraft={setDraft} paints={paints} />
           )}

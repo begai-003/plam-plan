@@ -3,7 +3,7 @@ import {
   signInWithPopup,
   onAuthStateChanged,
   signOut,
-} from "firebase/auth";
+} from "@firebase/auth";
 import { auth, allowedUid } from "./firebase";
 export const watchAuth = (callback, onError) =>
   onAuthStateChanged(auth, async (user) => {

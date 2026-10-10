@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
-import { Button, Empty, KitImage, Message, Modal, dateLabel } from "./common";
+import {
+  Button,
+  Empty,
+  KitPlaceholder,
+  Message,
+  Modal,
+  dateLabel,
+} from "./common";
 import {
   RunnerFields,
   GroupFields,
@@ -21,7 +28,7 @@ import {
   hasStock,
 } from "../domain";
 import { kitRepository } from "../services/repository";
-import { deleteKit } from "../services/imageRepository";
+import { deleteKit } from "../services/kitDeletion";
 export function EntityEditor({
   editor,
   paints,
@@ -186,7 +193,7 @@ export function KitDetail({
     if (
       kit.status !== "deleting" &&
       !window.confirm(
-        `「${kit.name}」とランナー・グループ・工程・マスキング・画像をすべて削除しますか？塗料台帳は保持します。`,
+        `「${kit.name}」とランナー・グループ・工程・マスキングをすべて削除しますか？塗料台帳は保持します。`,
       )
     )
       return;
@@ -239,7 +246,7 @@ export function KitDetail({
     <>
       <Button onClick={() => navigate("/")}>← キット一覧</Button>
       <section className="kit-header">
-        <KitImage path={kit.imagePath} name={kit.name} large />
+        <KitPlaceholder large />
         <div>
           <span className="eyebrow">{kit.series || "PAINTING PLAN"}</span>
           <h1>{kit.name}</h1>
@@ -265,7 +272,7 @@ export function KitDetail({
       <Message error>{error}</Message>
       {kit.status === "deleting" ? (
         <Message>
-          削除処理中です。画像とデータの削除を再試行してください。このキットは編集できません。
+          削除処理中です。データの削除を再試行してください。このキットは編集できません。
         </Message>
       ) : (
         <>

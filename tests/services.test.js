@@ -2,21 +2,17 @@ import { beforeEach, describe, it, expect, vi } from "vitest";
 import { kit, paint, paints } from "./fixtures.js";
 const state = vi.hoisted(() => ({
   docs: new Map(),
-  images: new Map(),
   writes: [],
   serverError: false,
   ambiguous: false,
-  removeError: false,
-  uploadError: false,
   authUser: null,
 }));
 vi.mock("../src/services/firebase.js", () => ({
   db: {},
-  storage: {},
   auth: {},
   allowedUid: "test-owner",
 }));
-vi.mock("firebase/firestore", () => ({
+vi.mock("@firebase/firestore", () => ({
   doc: (_, ...parts) => parts.join("/"),
   collection: () => "",
   onSnapshot: () => () => {},
@@ -49,24 +45,7 @@ vi.mock("firebase/firestore", () => ({
       throw Object.assign(new Error("unknown commit"), { code: "unavailable" });
   },
 }));
-vi.mock("firebase/storage", () => ({
-  ref: (_, path) => ({ fullPath: path }),
-  uploadBytes: async (ref, file) => {
-    if (state.uploadError) throw new Error("upload failed");
-    state.images.set(ref.fullPath, file);
-  },
-  getBlob: async (ref) => state.images.get(ref.fullPath),
-  deleteObject: async (ref) => {
-    if (state.removeError) throw new Error("delete failed");
-    state.images.delete(ref.fullPath);
-  },
-  listAll: async (ref) => ({
-    items: [...state.images.keys()]
-      .filter((path) => path.startsWith(ref.fullPath + "/"))
-      .map((fullPath) => ({ fullPath })),
-  }),
-}));
-vi.mock("firebase/auth", () => ({
+vi.mock("@firebase/auth", () => ({
   GoogleAuthProvider: class {
     setCustomParameters() {}
   },
@@ -78,23 +57,15 @@ vi.mock("firebase/auth", () => ({
   },
 }));
 import { kitRepository, paintRepository } from "../src/services/repository.js";
-import {
-  saveKitWithImage,
-  deleteKit,
-  retryCleanup,
-  pendingCleanup,
-} from "../src/services/imageRepository.js";
+import { deleteKit } from "../src/services/kitDeletion.js";
 import { login } from "../src/services/authService.js";
-import { signOut } from "firebase/auth";
+import { signOut } from "@firebase/auth";
 const path = "users/test-owner/kits/k";
 beforeEach(() => {
   state.docs.clear();
-  state.images.clear();
   state.writes = [];
   state.serverError = false;
   state.ambiguous = false;
-  state.removeError = false;
-  state.uploadError = false;
   state.authUser = { uid: "test-owner" };
   vi.stubGlobal("navigator", { onLine: true });
 });
@@ -143,109 +114,40 @@ describe("Firebase 保存契約", () => {
     ).rejects.toThrow("削除処理中");
   });
 });
-describe("画像交換・キット削除", () => {
-  const file = { type: "image/png", size: 3 };
-  it("画像アップロード後にDBを保存し、その後に旧画像を削除する", async () => {
-    const k = { ...kit(), imagePath: path + "/old" };
-    state.docs.set(path, { ...k, revision: 1, createdAt: { seconds: 1 } });
-    state.images.set(k.imagePath, file);
-    await saveKitWithImage(
-      "k",
-      k,
-      1,
-      { paints: paints(), previous: k },
-      file,
-      false,
-      "new",
-    );
-    expect(state.docs.get(path).imagePath).toBe(path + "/new");
-    expect(state.images.has(path + "/old")).toBe(false);
+describe("キット削除・旧データ互換", () => {
+  it("旧imagePathを除去して計画・revisionを維持する", async () => {
+    const k = { ...kit(), imagePath: "users/test-owner/kits/k/old" };
+    state.docs.set(path, { ...k, revision: 1 });
+    await kitRepository.save("k", k, 1, { paints: paints(), previous: k });
+    expect(state.docs.get(path)).not.toHaveProperty("imagePath");
+    expect(state.docs.get(path).groups).toEqual(k.groups);
+    expect(state.docs.get(path).revision).toBe(2);
   });
-  it("DB保存の失敗時は新画像を削除し旧画像を維持する", async () => {
-    const k = { ...kit(), imagePath: path + "/old" };
-    state.docs.set(path, { ...k, revision: 2 });
-    state.images.set(k.imagePath, file);
-    await expect(
-      saveKitWithImage(
-        "k",
-        k,
-        1,
-        { paints: paints(), previous: k },
-        file,
-        false,
-        "new",
-      ),
-    ).rejects.toThrow("別端末");
-    expect(state.images.has(path + "/new")).toBe(false);
-    expect(state.images.has(path + "/old")).toBe(true);
-  });
-  it("サーバー照会不能時は保存済みかもしれない新画像を破壊しない", async () => {
-    const k = kit();
-    state.serverError = true;
-    state.ambiguous = true;
-    await expect(
-      saveKitWithImage(
-        "k",
-        k,
-        null,
-        { paints: paints(), previous: null },
-        file,
-        false,
-        "new",
-      ),
-    ).rejects.toThrow("unknown");
-    expect(state.images.has(path + "/new")).toBe(true);
-  });
-  it("アップロード失敗時はDBを書き換えない", async () => {
-    state.uploadError = true;
-    await expect(
-      saveKitWithImage(
-        "k",
-        kit(),
-        null,
-        { paints: paints() },
-        file,
-        false,
-        "new",
-      ),
-    ).rejects.toThrow("upload");
-    expect(state.docs.size).toBe(0);
-  });
-  it("旧画像削除の失敗を通知し、再試行で削除する", async () => {
-    const k = { ...kit(), imagePath: path + "/old" };
-    state.docs.set(path, { ...k, revision: 1, createdAt: { seconds: 1 } });
-    state.images.set(k.imagePath, file);
-    state.removeError = true;
-    expect(
-      await saveKitWithImage(
-        "k",
-        k,
-        1,
-        { paints: paints(), previous: k },
-        file,
-        false,
-        "new",
-      ),
-    ).toContain("旧画像");
-    expect(pendingCleanup()).toContain(k.imagePath);
-    state.removeError = false;
-    await retryCleanup();
-    expect(pendingCleanup()).toEqual([]);
-    expect(state.images.has(k.imagePath)).toBe(false);
-  });
-  it("画像削除失敗はdeletingを保持し、次回再試行で塗料台帳を残す", async () => {
-    const k = { ...kit(), id: "k", revision: 1, imagePath: path + "/image" };
-    state.docs.set(path, k);
-    state.images.set(k.imagePath, file);
+  it("旧画像付きのdeletingキットもFirestoreだけで削除し台帳を残す", async () => {
+    state.docs.set(path, {
+      ...kit(),
+      revision: 2,
+      status: "deleting",
+      imagePath: "legacy",
+    });
     state.docs.set("users/test-owner/paints/p", paint());
-    state.removeError = true;
-    await expect(deleteKit(k)).rejects.toThrow("delete failed");
-    expect(state.docs.get(path).status).toBe("deleting");
-    state.removeError = false;
-    await deleteKit({ ...k, status: "deleting", revision: 2 });
+    await deleteKit({ id: "k", revision: 1 });
     expect(state.docs.has(path)).toBe(false);
     expect(state.docs.has("users/test-owner/paints/p")).toBe(true);
-    expect(state.images.size).toBe(0);
+  });
+  it("古いrevisionの削除は拒否する", async () => {
+    state.docs.set(path, { ...kit(), revision: 2 });
+    await expect(deleteKit({ id: "k", revision: 1 })).rejects.toThrow("別端末");
+    expect(state.docs.get(path).status).toBe("active");
+  });
+  it("削除の中断後は再試行できる", async () => {
+    state.docs.set(path, { ...kit(), revision: 1 });
+    state.ambiguous = true;
+    await expect(deleteKit({ id: "k", revision: 1 })).rejects.toThrow();
+    expect(state.docs.get(path).status).toBe("deleting");
+    state.ambiguous = false;
+    await deleteKit({ id: "k", revision: 1 });
+    expect(state.docs.has(path)).toBe(false);
   });
 });
 describe("Google 認証", () => {

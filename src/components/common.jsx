@@ -1,5 +1,4 @@
 import { cloneElement, useEffect, useId, useRef, useState } from "react";
-import { imageRepository } from "../services/imageRepository";
 export function Button({ children, tone = "", ...props }) {
   return (
     <button className={`button ${tone}`} type="button" {...props}>
@@ -95,53 +94,20 @@ export function Modal({
     </dialog>
   );
 }
-export function KitImage({ path, name, large = false }) {
-  const [url, setUrl] = useState(null);
-  const [error, setError] = useState(false);
-  const [retry, setRetry] = useState(0);
-  useEffect(() => {
-    let alive = true;
-    let objectUrl;
-    setUrl(null);
-    setError(false);
-    if (path)
-      imageRepository
-        .load(path)
-        .then((value) => {
-          objectUrl = value;
-          if (alive) setUrl(value);
-          else URL.revokeObjectURL(value);
-        })
-        .catch(() => {
-          if (alive) setError(true);
-        });
-    return () => {
-      alive = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [path, retry]);
+export function KitPlaceholder({ large = false }) {
   return (
-    <div className={`kit-image ${large ? "large" : ""}`}>
-      {url ? (
-        <img src={url} alt={`${name}のキット画像`} />
-      ) : error ? (
-        <div>
-          <p>画像を取得できません</p>
-          <Button onClick={() => setRetry((x) => x + 1)}>再試行</Button>
-        </div>
-      ) : (
-        <>
-          <svg viewBox="0 0 80 80" aria-hidden="true">
-            <path
-              d="M17 19h46v42H17zM27 19v42M53 19v42M17 30h46M17 50h46M33 36h14v9H33z"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            />
-          </svg>
-          <span>{path ? "画像を読み込み中…" : "キット画像なし"}</span>
-        </>
-      )}
+    <div
+      className={`kit-placeholder ${large ? "large" : ""}`}
+      aria-hidden="true"
+    >
+      <svg viewBox="0 0 80 80">
+        <path
+          d="M17 19h46v42H17zM27 19v42M53 19v42M17 30h46M17 50h46M33 36h14v9H33z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        />
+      </svg>
     </div>
   );
 }

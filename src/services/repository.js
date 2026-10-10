@@ -5,7 +5,7 @@ import {
   runTransaction,
   serverTimestamp,
   getDocFromServer,
-} from "firebase/firestore";
+} from "@firebase/firestore";
 import { db, allowedUid } from "./firebase";
 import {
   assertRevision,
@@ -21,7 +21,7 @@ export const watchRecords = (kind, next, error) =>
     error,
   );
 function editable(record) {
-  const { id, createdAt, updatedAt, revision, ...data } = record;
+  const { id, createdAt, updatedAt, revision, imagePath, ...data } = record;
   return data;
 }
 export async function saveRecord(

@@ -96,11 +96,9 @@ test("P-001〜P-021: Google認証、台帳、塗装計画、参照制約、編�
     .getByLabel("メーカー", { exact: true })
     .selectOption("GSIクレオス");
   await page.getByLabel("塗料検索").fill("");
-  const white = page
-    .locator("article")
-    .filter({
-      has: page.getByRole("heading", { name: "クールホワイト", exact: true }),
-    });
+  const white = page.locator("article").filter({
+    has: page.getByRole("heading", { name: "クールホワイト", exact: true }),
+  });
   await white.getByRole("button", { name: "編集", exact: true }).click();
   await page.getByLabel("瓶 1 残量（%・空欄可）").fill("0");
   await page.getByRole("button", { name: "保存", exact: true }).click();
@@ -109,18 +107,12 @@ test("P-001〜P-021: Google認証、台帳、塗装計画、参照制約、編�
   await page.getByRole("button", { name: "＋ キット登録" }).click();
   await page.getByLabel("キット名（必須）").fill("RG νガンダム");
   await page.getByLabel("シリーズ", { exact: true }).fill("RG");
-  const png = Buffer.from(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1cAAAAASUVORK5CYII=",
-    "base64",
-  );
-  await page
-    .getByLabel("キット画像（任意・5MiB以下）")
-    .setInputFiles({ name: "kit.png", mimeType: "image/png", buffer: png });
+  await expect(page.locator('input[type="file"]')).toHaveCount(0);
   await page.getByRole("button", { name: "登録", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "RG νガンダム", exact: true }),
   ).toBeVisible();
-  await expect(page.getByAltText("RG νガンダムのキット画像")).toBeVisible();
+  await expect(page.locator("img")).toHaveCount(0);
   await page.getByRole("tab", { name: "ランナー", exact: true }).click();
   await page.getByRole("button", { name: "＋ ランナー", exact: true }).click();
   await page.getByLabel("ランナー記号（必須）").fill(" a ");
@@ -273,7 +265,13 @@ test("別端末の競合、オフライン保存、未保存確認、モーダ�
   ];
   await db
     .doc("users/test-owner/kits/concurrent")
-    .set({ ...k, revision: 1, createdAt: now, updatedAt: now });
+    .set({
+      ...k,
+      imagePath: "users/test-owner/kits/concurrent/legacy",
+      revision: 1,
+      createdAt: now,
+      updatedAt: now,
+    });
   let accept = true;
   page.on("dialog", (d) => (accept ? d.accept() : d.dismiss()));
   await page.goto("./#/kits/concurrent");
@@ -294,6 +292,9 @@ test("別端末の競合、オフライン保存、未保存確認、モーダ�
   await expect(
     second.getByRole("heading", { name: "別端末で変更した名前", exact: true }),
   ).toBeVisible();
+  expect(
+    (await db.doc("users/test-owner/kits/concurrent").get()).data(),
+  ).not.toHaveProperty("imagePath");
   await page.getByRole("button", { name: "変更を保存" }).click();
   await expect(page.getByRole("alert")).toContainText("別端末");
   await expect(page.getByLabel("キット名（必須）")).toHaveValue(

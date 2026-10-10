@@ -9,7 +9,6 @@ import {
   hasStock,
   maskingLabel,
   duplicatePaint,
-  validateImage,
   assertRevision,
   newMasking,
   matchesPaint,
@@ -220,17 +219,7 @@ describe("P-011〜P-013、P-018 塗料台帳", () => {
     expect(matchesPaint(p, { name: "WHITE", color: "赤" })).toBe(false);
   });
 });
-describe("画像・競合・再試行", () => {
-  it("JPEG/PNG/WebPかつ5MiB以下のみ許可する", () => {
-    for (const type of ["image/jpeg", "image/png", "image/webp"])
-      expect(() => validateImage({ type, size: 100 })).not.toThrow();
-    expect(() => validateImage({ type: "image/svg+xml", size: 100 })).toThrow(
-      "JPEG",
-    );
-    expect(() =>
-      validateImage({ type: "image/png", size: 5 * 1024 * 1024 + 1 }),
-    ).toThrow("5MiB");
-  });
+describe("競合・再試行", () => {
   it("古いrevisionは更新不可", () => {
     expect(() => assertRevision(2, 1)).toThrow("別端末");
     expect(() => assertRevision(2, 2)).not.toThrow();

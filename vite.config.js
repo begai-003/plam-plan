@@ -17,10 +17,6 @@ export default defineConfig({
               test: /node_modules[\\/]@firebase[\\/]auth/,
             },
             {
-              name: "firebase-storage",
-              test: /node_modules[\\/]@firebase[\\/]storage/,
-            },
-            {
               name: "react",
               test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/,
             },

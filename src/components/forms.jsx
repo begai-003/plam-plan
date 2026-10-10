@@ -8,19 +8,10 @@ import {
   METHODS,
   ratioTenths,
   duplicatePaint,
-  validateImage,
 } from "../domain";
 const update = (set, key, value) =>
   set((previous) => ({ ...previous, [key]: value }));
-export function KitFields({
-  draft,
-  setDraft,
-  file,
-  setFile,
-  removeImage,
-  setRemoveImage,
-}) {
-  const [imageError, setImageError] = useState("");
+export function KitFields({ draft, setDraft }) {
   return (
     <>
       <Field
@@ -37,38 +28,6 @@ export function KitFields({
         value={draft.series}
         onChange={(e) => update(setDraft, "series", e.target.value)}
       />
-      <Field label="キット画像（任意・5MiB以下）">
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          onChange={(e) => {
-            const selected = e.target.files[0];
-            try {
-              if (selected) validateImage(selected);
-              setFile(selected || null);
-              setRemoveImage(false);
-              setImageError("");
-            } catch (error) {
-              setImageError(error.message);
-              e.target.value = "";
-              setFile(null);
-            }
-          }}
-        />
-      </Field>
-      <Message error>{imageError}</Message>
-      {file && <p>{file.name}</p>}
-      {draft.imagePath && (
-        <label className="check">
-          <input
-            type="checkbox"
-            checked={removeImage}
-            onChange={(e) => setRemoveImage(e.target.checked)}
-            disabled={Boolean(file)}
-          />
-          登録済み画像を削除する
-        </label>
-      )}
       <Memo
         value={draft.memo}
         onChange={(value) => update(setDraft, "memo", value)}
