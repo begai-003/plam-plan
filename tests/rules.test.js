@@ -14,14 +14,7 @@ import {
   updateDoc,
   deleteDoc,
   serverTimestamp,
-} from "firebase/firestore";
-import {
-  ref,
-  uploadBytes,
-  getBytes,
-  deleteObject,
-  listAll,
-} from "firebase/storage";
+} from "@firebase/firestore";
 import { newKit, newPaint } from "../src/domain.js";
 let env;
 const owner = "test-owner";
@@ -55,19 +48,10 @@ beforeAll(async () => {
         owner,
       ),
     },
-    storage: {
-      host: "127.0.0.1",
-      port: 9199,
-      rules: readFileSync("storage.rules", "utf8").replaceAll(
-        "__ALLOWED_UID__",
-        owner,
-      ),
-    },
   });
 });
 beforeEach(async () => {
   await env.clearFirestore();
-  await env.clearStorage();
 });
 afterAll(async () => {
   await env?.cleanup();
@@ -140,7 +124,7 @@ describe("Firestore Security Rules", () => {
       }),
     );
   });
-  it("画像は自分のキットのパスのみ許可する", async () => {
+  it("新規の画像パス登録を拒否する", async () => {
     await assertFails(
       setDoc(kitRef(db()), {
         ...kitData(),
@@ -184,51 +168,28 @@ describe("Firestore Security Rules", () => {
       await assertFails(setDoc(r, { ...paintData(), ...fields }));
   });
 });
-describe("Storage Security Rules", () => {
-  const image = (storage) => ref(storage, `users/${owner}/kits/kit/image`);
-  it("本人は画像のアップロード・取得・一覧・削除ができる", async () => {
-    const storage = env.authenticatedContext(owner).storage();
-    await assertSucceeds(
-      uploadBytes(image(storage), new Uint8Array([1, 2, 3]), {
-        contentType: "image/png",
-      }),
-    );
-    expect((await assertSucceeds(getBytes(image(storage)))).byteLength).toBe(3);
-    await assertSucceeds(listAll(ref(storage, `users/${owner}/kits/kit`)));
-    await assertSucceeds(deleteObject(image(storage)));
-  });
-  for (const uid of [null, "other"])
-    it(`${uid || "未認証"}の画像全操作を拒否する`, async () => {
-      const storage = uid
-        ? env.authenticatedContext(uid).storage()
-        : env.unauthenticatedContext().storage();
-      await assertFails(
-        uploadBytes(image(storage), new Uint8Array([1]), {
-          contentType: "image/png",
-        }),
-      );
-      await assertFails(getBytes(image(storage)));
-      await assertFails(listAll(ref(storage, `users/${owner}/kits/kit`)));
-      await assertFails(deleteObject(image(storage)));
+
+describe("旧キットの互換性", () => {
+  it("旧imagePathを読めて、計画を保ったまま除去できる", async () => {
+    await env.withSecurityRulesDisabled(async (context) => {
+      await setDoc(kitRef(context.firestore()), {
+        ...kitData(),
+        imagePath: "users/test-owner/kits/kit/legacy",
+      });
     });
-  it("不正な形式・サイズと他人のパスを拒否する", async () => {
-    const storage = env.authenticatedContext(owner).storage();
+    const r = kitRef(db());
+    const old = (await assertSucceeds(getDoc(r))).data();
     await assertFails(
-      uploadBytes(image(storage), new Uint8Array([1]), {
-        contentType: "image/svg+xml",
+      updateDoc(r, {
+        imagePath: "new",
+        revision: 2,
+        updatedAt: serverTimestamp(),
       }),
     );
-    await assertFails(
-      uploadBytes(image(storage), new Uint8Array(5 * 1024 * 1024 + 1), {
-        contentType: "image/png",
-      }),
+    const { imagePath, ...data } = old;
+    await assertSucceeds(
+      setDoc(r, { ...data, revision: 2, updatedAt: serverTimestamp() }),
     );
-    await assertFails(
-      uploadBytes(
-        ref(storage, "users/other/kits/kit/image"),
-        new Uint8Array([1]),
-        { contentType: "image/png" },
-      ),
-    );
+    expect((await getDoc(r)).data()).not.toHaveProperty("imagePath");
   });
 });

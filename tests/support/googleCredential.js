@@ -1,5 +1,5 @@
 // Test-only helper: Auth Emulator accepts synthetic Google ID tokens.
-import { GoogleAuthProvider, signInWithCredential } from "firebase/auth";
+import { GoogleAuthProvider, signInWithCredential } from "@firebase/auth";
 import { auth } from "../../src/services/firebase.js";
 export function signInAs(email) {
   const token = JSON.stringify({

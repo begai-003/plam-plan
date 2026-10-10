@@ -13,7 +13,7 @@ const result = spawnSync(
     "--project",
     "demo-plam-plan",
     "--only",
-    "firestore,storage",
+    "firestore",
     "node_modules/.bin/vitest run --config vitest.rules.config.js",
   ],
   {

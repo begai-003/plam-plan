@@ -10,7 +10,6 @@ export const newKit = () => ({
   name: "",
   series: "",
   memo: "",
-  imagePath: null,
   runners: [],
   groups: [],
   maskings: [],
@@ -142,10 +141,6 @@ export function validateKit(kit, paints = [], previous = null) {
   text(kit.name, "キット名", 100, true);
   text(kit.series, "シリーズ", 100);
   text(kit.memo, "メモ", 2000);
-  requireThat(
-    kit.imagePath === null || typeof kit.imagePath === "string",
-    "画像パスが不正です",
-  );
   requireThat(
     ["active", "deleting"].includes(kit.status),
     "キットの状態が不正です",
@@ -301,16 +296,6 @@ export function duplicatePaint(paint, paints) {
       p.id !== paint.id &&
       p.name.trim() === paint.name.trim() &&
       p.manufacturer.trim() === paint.manufacturer.trim(),
-  );
-}
-export function validateImage(file) {
-  requireThat(
-    ["image/jpeg", "image/png", "image/webp"].includes(file.type),
-    "画像はJPEG・PNG・WebPを選択してください",
-  );
-  requireThat(
-    file.size > 0 && file.size <= 5 * 1024 * 1024,
-    "画像は5MiB以下にしてください",
   );
 }
 export function assertRevision(current, expected) {

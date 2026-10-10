@@ -2,11 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { configured, auth } from "./services/firebase";
 import { watchAuth, login, logout } from "./services/authService";
 import { kitRepository, paintRepository } from "./services/repository";
-import { pendingCleanup, retryCleanup } from "./services/imageRepository";
 import {
   Button,
   Empty,
-  KitImage,
+  KitPlaceholder,
   Message,
   Modal,
   dateLabel,
@@ -270,14 +269,6 @@ function Workspace({ route, navigate, online, setDirty, notice, onNotice }) {
       stopPaints();
     };
   }, [retry]);
-  const cleanup = async () => {
-    try {
-      await retryCleanup();
-      onNotice("旧画像の削除が完了しました");
-    } catch (e) {
-      onNotice(e.message);
-    }
-  };
   if (error)
     return (
       <>
@@ -378,14 +369,6 @@ function Workspace({ route, navigate, online, setDirty, notice, onNotice }) {
   return (
     <>
       <Message>{notice}</Message>
-      {pendingCleanup().length > 0 && (
-        <Message>
-          旧画像の削除が未完了です。
-          <Button disabled={!online} onClick={cleanup}>
-            画像の削除を再試行
-          </Button>
-        </Message>
-      )}
       {page}
     </>
   );
@@ -449,7 +432,7 @@ function KitList({ kits, navigate }) {
         <div className={`kit-grid ${view}`}>
           {kits.map((kit) => (
             <article className="kit-card" key={kit.id}>
-              <KitImage path={kit.imagePath} name={kit.name} />
+              <KitPlaceholder />
               <div className="kit-card-body">
                 <span className="eyebrow">{kit.series || "KIT"}</span>
                 <h2>{kit.name}</h2>
