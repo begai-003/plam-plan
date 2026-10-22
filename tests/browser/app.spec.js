@@ -55,7 +55,7 @@ async function signIn(page, email = "owner@example.test") {
 async function addPaint(page, name) {
   await page.getByRole("button", { name: "＋ 塗料登録" }).click();
   await page.getByLabel("塗料名（必須）").fill(name);
-  await page.getByLabel("メーカー（必須）").fill("GSIクレオス");
+  await page.getByLabel("メーカー（必須）").selectOption("GSIクレオス");
   await page.getByLabel("色（必須）").fill("白");
   await page.getByRole("button", { name: "＋ 原液の瓶" }).click();
   await page.getByLabel("瓶 1 残量（%・空欄可）").fill("80");
@@ -263,15 +263,13 @@ test("別端末の競合、オフライン保存、未保存確認、モーダ�
   k.groups[0].processes[0].paintUsages = [
     { paintId: "white", ratioTenths: 1000 },
   ];
-  await db
-    .doc("users/test-owner/kits/concurrent")
-    .set({
-      ...k,
-      imagePath: "users/test-owner/kits/concurrent/legacy",
-      revision: 1,
-      createdAt: now,
-      updatedAt: now,
-    });
+  await db.doc("users/test-owner/kits/concurrent").set({
+    ...k,
+    imagePath: "users/test-owner/kits/concurrent/legacy",
+    revision: 1,
+    createdAt: now,
+    updatedAt: now,
+  });
   let accept = true;
   page.on("dialog", (d) => (accept ? d.accept() : d.dismiss()));
   await page.goto("./#/kits/concurrent");
@@ -326,4 +324,78 @@ test("別端末の競合、オフライン保存、未保存確認、モーダ�
     page.getByRole("heading", { name: "Bランナー", exact: true }),
   ).toHaveCount(0);
   await second.close();
+});
+
+test("塗料のプルダウン選択と既存のメーカー・種類の保持", async ({ page }) => {
+  const { getFirestore, Timestamp } = await import("firebase-admin/firestore");
+  const { paint } = await import("../fixtures.js");
+  const db = getFirestore(admin);
+  const now = Timestamp.now();
+  const { id, ...legacy } = paint();
+  await db
+    .doc("users/test-owner/paints/legacy-select")
+    .set({
+      ...legacy,
+      name: "既存の独自塗料",
+      manufacturer: "既存メーカー",
+      type: "ラッカー",
+      revision: 1,
+      createdAt: now,
+      updatedAt: now,
+    });
+  await page.goto("./#/paints");
+  await signIn(page);
+  const card = page
+    .locator("article")
+    .filter({
+      has: page.getByRole("heading", { name: "既存の独自塗料", exact: true }),
+    });
+  await card.getByRole("button", { name: "編集", exact: true }).click();
+  await expect(page.getByLabel("メーカー（必須）")).toHaveValue("既存メーカー");
+  await expect(page.getByLabel("塗料種類", { exact: true })).toHaveValue(
+    "ラッカー",
+  );
+  await page.getByLabel("メモ", { exact: true }).fill("既存値を変更せず保存");
+  await page.getByRole("button", { name: "保存", exact: true }).click();
+  let saved = (
+    await db.doc("users/test-owner/paints/legacy-select").get()
+  ).data();
+  expect(saved.manufacturer).toBe("既存メーカー");
+  expect(saved.type).toBe("ラッカー");
+  expect(saved.bottles).toEqual(legacy.bottles);
+  await page.getByRole("button", { name: "＋ 塗料登録" }).click();
+  const manufacturer = page.getByLabel("メーカー（必須）");
+  const type = page.getByLabel("塗料種類", { exact: true });
+  await expect(manufacturer.locator("option")).toHaveText([
+    "選択してください",
+    "ガイアノーツ",
+    "GSIクレオス",
+    "タミヤ",
+    "その他",
+  ]);
+  await expect(type.locator("option")).toHaveText([
+    "未指定",
+    "ラッカー系",
+    "水性アクリル系",
+    "エナメル系",
+    "その他",
+  ]);
+  await expect(manufacturer).toHaveAttribute("required", "");
+  await expect(type).not.toHaveAttribute("required", "");
+  await page.getByLabel("塗料名（必須）").fill("選択式で登録");
+  await page.getByLabel("色（必須）").fill("白");
+  await manufacturer.selectOption("ガイアノーツ");
+  await type.selectOption("水性アクリル系");
+  await page.getByRole("button", { name: "登録", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "選択式で登録", exact: true }),
+  ).toBeVisible();
+  const results = await db
+    .collection("users/test-owner/paints")
+    .where("name", "==", "選択式で登録")
+    .get();
+  expect(results.size).toBe(1);
+  saved = results.docs[0].data();
+  expect(saved.manufacturer).toBe("ガイアノーツ");
+  expect(saved.type).toBe("水性アクリル系");
 });

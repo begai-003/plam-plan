@@ -424,6 +424,10 @@ export function MaskingFields({ draft, setDraft, kit }) {
   );
 }
 export function PaintFields({ draft, setDraft, paints }) {
+  const choices = {
+    manufacturer: ["ガイアノーツ", "GSIクレオス", "タミヤ", "その他"],
+    type: ["ラッカー系", "水性アクリル系", "エナメル系", "その他"],
+  };
   return (
     <>
       {[
@@ -431,16 +435,41 @@ export function PaintFields({ draft, setDraft, paints }) {
         ["manufacturer", "メーカー"],
         ["color", "色"],
         ["type", "塗料種類"],
-      ].map(([key, label]) => (
-        <Field
-          key={key}
-          label={`${label}${key !== "type" ? "（必須）" : ""}`}
-          required={key !== "type"}
-          maxLength={100}
-          value={draft[key]}
-          onChange={(e) => update(setDraft, key, e.target.value)}
-        />
-      ))}
+      ].map(([key, label]) =>
+        choices[key] ? (
+          <Field
+            key={key}
+            label={`${label}${key === "manufacturer" ? "（必須）" : ""}`}
+          >
+            <select
+              required={key === "manufacturer"}
+              value={draft[key]}
+              onChange={(e) => update(setDraft, key, e.target.value)}
+            >
+              <option value="">
+                {key === "manufacturer" ? "選択してください" : "未指定"}
+              </option>
+              {draft[key] && !choices[key].includes(draft[key]) && (
+                <option value={draft[key]}>{draft[key]}（登録済み）</option>
+              )}
+              {choices[key].map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </Field>
+        ) : (
+          <Field
+            key={key}
+            label={`${label}（必須）`}
+            required
+            maxLength={100}
+            value={draft[key]}
+            onChange={(e) => update(setDraft, key, e.target.value)}
+          />
+        ),
+      )}
       {duplicatePaint(draft, paints) && (
         <Message>
           同じメーカー・塗料名が登録されています。追加購入の場合は既存商品の瓶を追加してください。
